@@ -84,6 +84,7 @@ class ListingProvider extends ChangeNotifier {
 
   Future<void> createListing(ListingModel listing) async {
     _status = ListingStatus.loading;
+    _errorMessage = null;
     notifyListeners();
     try {
       await _service.createListing(listing);
@@ -97,6 +98,7 @@ class ListingProvider extends ChangeNotifier {
 
   Future<void> updateListing(ListingModel listing) async {
     _status = ListingStatus.loading;
+    _errorMessage = null;
     notifyListeners();
     try {
       await _service.updateListing(listing);
@@ -110,6 +112,7 @@ class ListingProvider extends ChangeNotifier {
 
   Future<void> deleteListing(String id) async {
     _status = ListingStatus.loading;
+    _errorMessage = null;
     notifyListeners();
     try {
       await _service.deleteListing(id);

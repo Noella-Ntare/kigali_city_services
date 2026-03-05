@@ -7,9 +7,9 @@ enum AuthStatus { initial, authenticated, unauthenticated, unverified }
 
 class AuthProvider extends ChangeNotifier {
   final AuthService _authService;
+  bool _isDisposed = false;
 
   AuthProvider(this._authService) {
-    // Listen to auth state changes
     _authService.authStateChanges.listen(_onAuthStateChanged);
   }
 
@@ -25,6 +25,8 @@ class AuthProvider extends ChangeNotifier {
   User? get firebaseUser => _authService.currentUser;
 
   void _onAuthStateChanged(User? user) async {
+    if (_isDisposed) return; // stop if disposed
+
     if (user == null) {
       _status = AuthStatus.unauthenticated;
       _userProfile = null;
@@ -33,6 +35,7 @@ class AuthProvider extends ChangeNotifier {
     } else {
       _status = AuthStatus.authenticated;
       _userProfile = await _authService.getUserProfile(user.uid);
+      if (_isDisposed) return; // check again after await
     }
     notifyListeners();
   }
@@ -91,10 +94,10 @@ class AuthProvider extends ChangeNotifier {
     _setLoading(true);
     try {
       final verified = await _authService.checkEmailVerified();
-      if (verified) {
+      if (verified && !_isDisposed) {
         _status = AuthStatus.authenticated;
-        _userProfile = await _authService.getUserProfile(
-            _authService.currentUser!.uid);
+        _userProfile =
+            await _authService.getUserProfile(_authService.currentUser!.uid);
         notifyListeners();
       }
     } finally {
@@ -103,6 +106,7 @@ class AuthProvider extends ChangeNotifier {
   }
 
   void _setLoading(bool val) {
+    if (_isDisposed) return;
     _isLoading = val;
     notifyListeners();
   }
@@ -124,5 +128,11 @@ class AuthProvider extends ChangeNotifier {
       default:
         return 'Authentication failed. Please try again.';
     }
+  }
+
+  @override
+  void dispose() {
+    _isDisposed = true;
+    super.dispose();
   }
 }
