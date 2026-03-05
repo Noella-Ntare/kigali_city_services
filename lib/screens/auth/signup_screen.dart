@@ -29,11 +29,25 @@ class _SignupScreenState extends State<SignupScreen> {
 
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
-    await context.read<AuthProvider>().signUp(
-          email: _emailCtrl.text.trim(),
-          password: _passwordCtrl.text,
-          displayName: _nameCtrl.text.trim(),
-        );
+
+    final auth = context.read<AuthProvider>();
+
+    await auth.signUp(
+      email: _emailCtrl.text.trim(),
+      password: _passwordCtrl.text,
+      displayName: _nameCtrl.text.trim(),
+    );
+
+    // Show error if signup failed
+    if (mounted && auth.errorMessage != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(auth.errorMessage!),
+          backgroundColor: Colors.red,
+          duration: const Duration(seconds: 4),
+        ),
+      );
+    }
   }
 
   @override
@@ -57,8 +71,7 @@ class _SignupScreenState extends State<SignupScreen> {
                         color: AppColors.textPrimary)),
                 const SizedBox(height: 4),
                 const Text('Join the Kigali City directory',
-                    style:
-                        TextStyle(fontSize: 13, color: AppColors.textMuted)),
+                    style: TextStyle(fontSize: 13, color: AppColors.textMuted)),
                 const SizedBox(height: 24),
 
                 // Display Name
@@ -85,8 +98,9 @@ class _SignupScreenState extends State<SignupScreen> {
                     prefixIcon:
                         Icon(Icons.email_outlined, color: AppColors.textDim),
                   ),
-                  validator: (v) =>
-                      v == null || !v.contains('@') ? 'Enter a valid email' : null,
+                  validator: (v) => v == null || !v.contains('@')
+                      ? 'Enter a valid email'
+                      : null,
                 ),
                 const SizedBox(height: 14),
 
@@ -122,9 +136,8 @@ class _SignupScreenState extends State<SignupScreen> {
                     prefixIcon:
                         Icon(Icons.lock_outline, color: AppColors.textDim),
                   ),
-                  validator: (v) => v != _passwordCtrl.text
-                      ? 'Passwords do not match'
-                      : null,
+                  validator: (v) =>
+                      v != _passwordCtrl.text ? 'Passwords do not match' : null,
                 ),
                 const SizedBox(height: 8),
 

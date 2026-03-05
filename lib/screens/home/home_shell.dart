@@ -28,9 +28,19 @@ class _HomeShellState extends State<HomeShell> {
   @override
   void initState() {
     super.initState();
+    _startListening();
+  }
+
+  void _startListening() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
       final uid = context.read<AuthProvider>().firebaseUser?.uid;
       final provider = context.read<ListingProvider>();
+
+      // Cancel any existing subscriptions first
+      provider.cancelSubscriptions();
+
+      // Start fresh subscriptions
       provider.subscribeToAllListings();
       if (uid != null) provider.subscribeToMyListings(uid);
     });

@@ -95,6 +95,8 @@ class AuthProvider extends ChangeNotifier {
     try {
       final verified = await _authService.checkEmailVerified();
       if (verified && !_isDisposed) {
+        // Force token refresh so email_verified == true in Firestore rules
+        await _authService.currentUser?.getIdToken(true);
         _status = AuthStatus.authenticated;
         _userProfile =
             await _authService.getUserProfile(_authService.currentUser!.uid);

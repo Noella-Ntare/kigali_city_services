@@ -7,6 +7,7 @@ enum ListingStatus { initial, loading, success, error }
 
 class ListingProvider extends ChangeNotifier {
   final ListingService _service;
+  bool _isDisposed = false;
 
   ListingProvider(this._service);
 
@@ -47,19 +48,22 @@ class ListingProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  // Start listening to all listings (call once on app start after auth)
   void subscribeToAllListings() {
+    _allSub?.cancel();
+    _allSub = null;
     _status = ListingStatus.loading;
     notifyListeners();
 
-    _allSub?.cancel();
     _allSub = _service.getAllListings().listen(
       (listings) {
+        if (_isDisposed) return;
         _allListings = listings;
         _status = ListingStatus.success;
+        _errorMessage = null;
         notifyListeners();
       },
       onError: (e) {
+        if (_isDisposed) return;
         _errorMessage = 'Failed to load listings: $e';
         _status = ListingStatus.error;
         notifyListeners();
@@ -67,15 +71,18 @@ class ListingProvider extends ChangeNotifier {
     );
   }
 
-  // Start listening to current user's listings
   void subscribeToMyListings(String uid) {
     _mySub?.cancel();
+    _mySub = null;
+
     _mySub = _service.getMyListings(uid).listen(
       (listings) {
+        if (_isDisposed) return;
         _myListings = listings;
         notifyListeners();
       },
       onError: (e) {
+        if (_isDisposed) return;
         _errorMessage = 'Failed to load your listings: $e';
         notifyListeners();
       },
@@ -83,54 +90,51 @@ class ListingProvider extends ChangeNotifier {
   }
 
   Future<void> createListing(ListingModel listing) async {
-    _status = ListingStatus.loading;
     _errorMessage = null;
-    notifyListeners();
     try {
       await _service.createListing(listing);
-      _status = ListingStatus.success;
+      // Stream will automatically update _allListings via subscription
     } catch (e) {
       _errorMessage = 'Failed to create listing: $e';
       _status = ListingStatus.error;
+      notifyListeners();
     }
-    notifyListeners();
   }
 
   Future<void> updateListing(ListingModel listing) async {
-    _status = ListingStatus.loading;
     _errorMessage = null;
-    notifyListeners();
     try {
       await _service.updateListing(listing);
-      _status = ListingStatus.success;
+      // Stream will automatically update via subscription
     } catch (e) {
       _errorMessage = 'Failed to update listing: $e';
       _status = ListingStatus.error;
+      notifyListeners();
     }
-    notifyListeners();
   }
 
   Future<void> deleteListing(String id) async {
-    _status = ListingStatus.loading;
     _errorMessage = null;
-    notifyListeners();
     try {
       await _service.deleteListing(id);
-      _status = ListingStatus.success;
+      // Stream will automatically update via subscription
     } catch (e) {
       _errorMessage = 'Failed to delete listing: $e';
       _status = ListingStatus.error;
+      notifyListeners();
     }
-    notifyListeners();
   }
 
   void cancelSubscriptions() {
     _allSub?.cancel();
     _mySub?.cancel();
+    _allSub = null;
+    _mySub = null;
   }
 
   @override
   void dispose() {
+    _isDisposed = true;
     cancelSubscriptions();
     super.dispose();
   }
