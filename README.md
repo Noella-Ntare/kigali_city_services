@@ -1,172 +1,172 @@
-# Kigali City Services & Places Directory
+# Kigali City Services
 
-A Flutter mobile application for discovering and managing public services and leisure locations across Kigali, Rwanda.
+A Flutter mobile application that allows residents and visitors of Kigali, Rwanda, to discover, add, and navigate local services including restaurants, hospitals, cafés, and other points of interest.
 
 ---
 
 ## Features
 
-- **Firebase Authentication** — Sign up, log in, log out, email verification enforced
-- **Firestore CRUD** — Create, read, update, delete location listings in real time
-- **Directory Search & Filter** — Search by name, filter by category (Hospital, Café, Park, etc.)
-- **Google Maps Integration** — Embedded map with marker on detail page + turn-by-turn navigation
-- **My Listings** — Users manage only their own listings
-- **State Management (Provider)** — Clean architecture with service/provider layers
-- **Settings** — User profile display + location notification toggle
+| Feature | Description |
+|---|---|
+| Authentication | Email/password signup & login via Firebase Auth with mandatory email verification |
+| Directory | Browse all listings with real-time Firestore updates |
+| My Listings | View, edit, and delete listings created by the signed-in user |
+| Map View | Embedded Google Map displaying markers for all listings |
+| Search & Filter | Search by name and filter by category (client-side, instant) |
+| Listing Detail | Full detail page with embedded map marker and navigation launch |
+| Settings | Display user profile and toggle notification preference |
 
 ---
 
-## Firestore Database Structure
+## Tech Stack
 
-```
-listings/                         ← Collection
-  {docId}/                        ← Auto-generated document
-    name:          string
-    category:      string         ← Hospital | Police Station | Library | Restaurant | Café | Park | Tourist Attraction | Pharmacy | Utility Office
-    address:       string
-    contactNumber: string
-    description:   string
-    latitude:      number
-    longitude:     number
-    createdBy:     string         ← Firebase Auth UID
-    createdAt:     timestamp
-
-users/                            ← Collection
-  {uid}/                          ← Document ID = Firebase Auth UID
-    email:         string
-    displayName:   string
-    createdAt:     timestamp
-```
+- **Framework:** Flutter (Dart)
+- **Backend:** Firebase (Auth + Firestore)
+- **Maps:** google_maps_flutter + url_launcher (for navigation)
+- **State Management:** Provider (ChangeNotifier)
+- **Min SDK:** Android 21 (Lollipop)
 
 ---
 
-## State Management (Provider)
+## Firebase Setup
 
-| Provider | Responsibility |
-|----------|---------------|
-| `AuthProvider` | Tracks Firebase Auth state, handles sign up/in/out, email verification |
-| `ListingProvider` | Streams all listings + user listings from Firestore, handles CRUD, search/filter logic |
-| `SettingsProvider` | Manages local notification preference via SharedPreferences |
+1. Create a Firebase project at [console.firebase.google.com](https://console.firebase.google.com).
+2. Enable **Email/Password** authentication under Authentication → Sign-in method.
+3. Create a **Cloud Firestore** database in production mode.
+4. Register an Android app and download `google-services.json` → place in `android/app/`.
+5. Enable **Maps SDK for Android** in Google Cloud Console → APIs & Services.
+6. Add your Maps API key to `android/app/src/main/AndroidManifest.xml`:
 
-**Architecture flow:**
-```
-UI Screens
-    ↓  context.watch<Provider>()
-Providers (ChangeNotifier)
-    ↓  calls
-Services (AuthService / ListingService)
-    ↓  calls
-Firebase (FirebaseAuth / Firestore)
-```
-
-UI widgets **never** call Firebase directly.
-
----
-
-## Navigation Structure
-
-| Tab | Screen |
-|-----|--------|
-| Directory | Browse all listings with search + filter |
-| My Listings | View, create, edit, delete own listings |
-| Map View | Google Map showing all listing markers |
-| Settings | User profile + notification toggle |
-
----
-
-## Setup Instructions
-
-### 1. Clone the repository
-```bash
-git clone https://github.com/YOUR_USERNAME/kigali_city_services.git
-cd kigali_city_services
-```
-
-### 2. Install FlutterFire CLI and configure Firebase
-```bash
-dart pub global activate flutterfire_cli
-flutterfire configure
-```
-Select your Firebase project — this generates `lib/firebase_options.dart`.
-
-### 3. Add Google Maps API Key
-
-**Android** — `android/app/src/main/AndroidManifest.xml`:
 ```xml
-<meta-data
-  android:name="com.google.android.geo.API_KEY"
-  android:value="YOUR_GOOGLE_MAPS_API_KEY"/>
+<application ...>
+  <meta-data
+    android:name="com.google.android.geo.API_KEY"
+    android:value="YOUR_API_KEY_HERE"/>
+  ...
+</application>
 ```
 
-**iOS** — `ios/Runner/AppDelegate.swift`:
-```swift
-GMSServices.provideAPIKey("YOUR_GOOGLE_MAPS_API_KEY")
-```
+7. Deploy Firestore Security Rules:
 
-### 4. Set Firestore Security Rules
 ```
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     match /users/{uid} {
-      allow read, write: if request.auth != null && request.auth.uid == uid;
+      allow read, write: if request.auth.uid == uid;
     }
     match /listings/{listingId} {
       allow read: if request.auth != null;
       allow create: if request.auth != null;
-      allow update, delete: if request.auth != null
-        && request.auth.uid == resource.data.createdBy;
+      allow update, delete: if request.auth.uid == resource.data.ownerId;
     }
   }
 }
 ```
 
-### 5. Add SharedPreferences dependency (for Settings)
-```yaml
-shared_preferences: ^2.2.2
+---
+
+## Firestore Database Structure
+
+### `users/{uid}`
+```
+{
+  uid:                   String   // Firebase Auth UID
+  displayName:           String
+  email:                 String
+  createdAt:             Timestamp
+  notificationsEnabled:  Boolean
+}
 ```
 
-### 6. Install dependencies and run
+### `listings/{listingId}`
+```
+{
+  id:          String    // Firestore document ID
+  ownerId:     String    // Auth UID of creator
+  name:        String
+  category:    String    // Restaurant | Hospital | Café | Hotel | Other
+  address:     String
+  contact:     String
+  description: String
+  latitude:    Double
+  longitude:   Double
+  createdAt:   Timestamp
+}
+```
+
+---
+
+## State Management
+
+The app uses **Provider** with two ChangeNotifier classes:
+
+### `AuthProvider`
+- Wraps `FirebaseAuth.instance.authStateChanges()`
+- Polls `user.emailVerified` via a Timer until verification is confirmed
+- Creates a corresponding Firestore user document on first signup
+
+### `ListingProvider`
+- Subscribes to Firestore `listings` collection via `snapshots()` (real-time)
+- Exposes `allListings` and `myListings` (filtered by `ownerId`)
+- CRUD operations delegated to `ListingService`; `notifyListeners()` called after each mutation
+- Directory, My Listings, and Map View rebuild automatically on any change
+
+---
+
+## Project Structure
+
+```
+lib/
+├── main.dart
+├── theme.dart
+├── models/
+│   ├── listing.dart
+│   └── app_user.dart
+├── providers/
+│   ├── auth_provider.dart
+│   └── listing_provider.dart
+├── services/
+│   ├── auth_service.dart
+│   └── listing_service.dart
+└── screens/
+    ├── auth/
+    │   ├── login_screen.dart
+    │   ├── signup_screen.dart
+    │   └── email_verification_screen.dart
+    ├── home/
+    │   └── home_screen.dart          # BottomNavigationBar shell
+    ├── directory/
+    │   └── directory_screen.dart
+    ├── listings/
+    │   ├── my_listings_screen.dart
+    │   ├── add_listing_screen.dart
+    │   └── edit_listing_screen.dart
+    ├── map/
+    │   └── map_view_screen.dart
+    ├── detail/
+    │   └── listing_detail_screen.dart
+    └── settings/
+        └── settings_screen.dart
+```
+
+---
+
+## Running the App
+
 ```bash
 flutter pub get
 flutter run
 ```
 
+> Requires a connected Android device or emulator with Google Play Services installed.
+
 ---
 
-## Folder Structure
+## Navigation
 
-```
-lib/
-├── main.dart                    ← App entry + routing
-├── theme.dart                   ← Colors, ThemeData
-├── firebase_options.dart        ← Generated by FlutterFire CLI
-├── models/
-│   ├── listing_model.dart
-│   └── user_model.dart
-├── services/
-│   ├── auth_service.dart        ← All Firebase Auth calls
-│   └── listing_service.dart     ← All Firestore calls
-├── providers/
-│   ├── auth_provider.dart
-│   ├── listing_provider.dart
-│   └── settings_provider.dart
-└── screens/
-    ├── auth/
-    │   ├── login_screen.dart
-    │   ├── signup_screen.dart
-    │   └── verify_email_screen.dart
-    ├── home/
-    │   └── home_shell.dart      ← BottomNavigationBar shell
-    ├── directory/
-    │   └── directory_screen.dart
-    ├── detail/
-    │   └── listing_detail_screen.dart
-    ├── my_listings/
-    │   ├── my_listings_screen.dart
-    │   └── listing_form_screen.dart
-    ├── map/
-    │   └── map_view_screen.dart
-    └── settings/
-        └── settings_screen.dart
-```
+Bottom navigation bar with four tabs:
+1. **Directory** — all listings, search, category filter
+2. **My Listings** — user-owned listings with edit/delete
+3. **Map View** — Google Map with all listing markers
+4. **Settings** — profile info, notification toggle, logout
