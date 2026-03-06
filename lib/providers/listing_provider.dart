@@ -91,21 +91,32 @@ class ListingProvider extends ChangeNotifier {
 
   Future<void> createListing(ListingModel listing) async {
     _errorMessage = null;
+    // Optimistically add to local lists immediately
+    _myListings = [listing, ..._myListings];
+    _allListings = [listing, ..._allListings];
+    notifyListeners();
     try {
       await _service.createListing(listing);
-      // Stream will automatically update _allListings via subscription
     } catch (e) {
       _errorMessage = 'Failed to create listing: $e';
       _status = ListingStatus.error;
+      // Revert on failure
+      _myListings.removeWhere((l) => l.name == listing.name);
+      _allListings.removeWhere((l) => l.name == listing.name);
       notifyListeners();
     }
   }
 
   Future<void> updateListing(ListingModel listing) async {
     _errorMessage = null;
+    // Optimistically update local lists immediately
+    _myListings =
+        _myListings.map((l) => l.id == listing.id ? listing : l).toList();
+    _allListings =
+        _allListings.map((l) => l.id == listing.id ? listing : l).toList();
+    notifyListeners();
     try {
       await _service.updateListing(listing);
-      // Stream will automatically update via subscription
     } catch (e) {
       _errorMessage = 'Failed to update listing: $e';
       _status = ListingStatus.error;
@@ -115,9 +126,12 @@ class ListingProvider extends ChangeNotifier {
 
   Future<void> deleteListing(String id) async {
     _errorMessage = null;
+    // Optimistically remove from local lists immediately
+    _myListings = _myListings.where((l) => l.id != id).toList();
+    _allListings = _allListings.where((l) => l.id != id).toList();
+    notifyListeners();
     try {
       await _service.deleteListing(id);
-      // Stream will automatically update via subscription
     } catch (e) {
       _errorMessage = 'Failed to delete listing: $e';
       _status = ListingStatus.error;

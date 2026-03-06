@@ -1,9 +1,16 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../models/listing_model.dart';
 
 class ListingService {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
+  final FirebaseAuth _auth = FirebaseAuth.instance;
   final String _collection = 'listings';
+
+  // Force refresh token before write operations
+  Future<void> _refreshToken() async {
+    await _auth.currentUser?.getIdToken(true);
+  }
 
   // Stream all listings (real-time)
   Stream<List<ListingModel>> getAllListings() {
@@ -28,11 +35,13 @@ class ListingService {
 
   // Create listing
   Future<void> createListing(ListingModel listing) async {
+    await _refreshToken();
     await _db.collection(_collection).add(listing.toFirestore());
   }
 
   // Update listing
   Future<void> updateListing(ListingModel listing) async {
+    await _refreshToken();
     await _db
         .collection(_collection)
         .doc(listing.id)
@@ -41,6 +50,7 @@ class ListingService {
 
   // Delete listing
   Future<void> deleteListing(String listingId) async {
+    await _refreshToken();
     await _db.collection(_collection).doc(listingId).delete();
   }
 }

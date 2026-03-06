@@ -6,11 +6,36 @@ import '../../models/listing_model.dart';
 import '../../theme.dart';
 import 'listing_form_screen.dart';
 
-class MyListingsScreen extends StatelessWidget {
+class MyListingsScreen extends StatefulWidget {
   const MyListingsScreen({super.key});
 
   @override
+  State<MyListingsScreen> createState() => _MyListingsScreenState();
+}
+
+class _MyListingsScreenState extends State<MyListingsScreen> {
+  String? _currentUid;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _subscribe());
+  }
+
+  void _subscribe() {
+    if (!mounted) return;
+    final uid = context.read<AuthProvider>().firebaseUser?.uid;
+    if (uid != null && uid != _currentUid) {
+      _currentUid = uid;
+      context.read<ListingProvider>().subscribeToMyListings(uid);
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
+    // Re-subscribe every build in case uid changed
+    _subscribe();
+
     final provider = context.watch<ListingProvider>();
     final uid = context.read<AuthProvider>().firebaseUser?.uid ?? '';
     final listings = provider.myListings;
@@ -19,15 +44,30 @@ class MyListingsScreen extends StatelessWidget {
       appBar: AppBar(
         title: const Text('My Listings',
             style: TextStyle(fontWeight: FontWeight.w700)),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh, color: AppColors.gold),
+            onPressed: () {
+              final uid = context.read<AuthProvider>().firebaseUser?.uid;
+              if (uid != null) {
+                context.read<ListingProvider>().subscribeToMyListings(uid);
+              }
+            },
+          )
+        ],
       ),
       floatingActionButton: FloatingActionButton(
         backgroundColor: AppColors.gold,
         foregroundColor: AppColors.navy,
-        onPressed: () => Navigator.push(
-          context,
-          MaterialPageRoute(
-              builder: (_) => ListingFormScreen(createdBy: uid)),
-        ),
+        onPressed: () async {
+          await Navigator.push(
+            context,
+            MaterialPageRoute(
+                builder: (_) => ListingFormScreen(createdBy: uid)),
+          );
+          // Resubscribe after returning from form
+          _subscribe();
+        },
         child: const Icon(Icons.add),
       ),
       body: listings.isEmpty
@@ -39,12 +79,11 @@ class MyListingsScreen extends StatelessWidget {
                       color: AppColors.textDim, size: 56),
                   SizedBox(height: 12),
                   Text('No listings yet',
-                      style: TextStyle(
-                          color: AppColors.textMuted, fontSize: 16)),
+                      style:
+                          TextStyle(color: AppColors.textMuted, fontSize: 16)),
                   SizedBox(height: 4),
                   Text('Tap + to add your first listing',
-                      style: TextStyle(
-                          color: AppColors.textDim, fontSize: 13)),
+                      style: TextStyle(color: AppColors.textDim, fontSize: 13)),
                 ],
               ),
             )
@@ -80,8 +119,7 @@ class _MyListingCard extends StatelessWidget {
                   decoration: BoxDecoration(
                     color: AppColors.gold.withOpacity(0.15),
                     borderRadius: BorderRadius.circular(8),
-                    border: Border.all(
-                        color: AppColors.gold.withOpacity(0.3)),
+                    border: Border.all(color: AppColors.gold.withOpacity(0.3)),
                   ),
                   child: Text(listing.category,
                       style: const TextStyle(
@@ -90,19 +128,19 @@ class _MyListingCard extends StatelessWidget {
                           fontWeight: FontWeight.w600)),
                 ),
                 const Spacer(),
-                // Edit button
                 IconButton(
                   icon: const Icon(Icons.edit_outlined,
                       color: AppColors.textMuted, size: 18),
-                  onPressed: () => Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => ListingFormScreen(
-                          existingListing: listing, createdBy: uid),
-                    ),
-                  ),
+                  onPressed: () async {
+                    await Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => ListingFormScreen(
+                            existingListing: listing, createdBy: uid),
+                      ),
+                    );
+                  },
                 ),
-                // Delete button
                 IconButton(
                   icon: const Icon(Icons.delete_outline,
                       color: AppColors.error, size: 18),
@@ -118,14 +156,13 @@ class _MyListingCard extends StatelessWidget {
                     fontSize: 15)),
             const SizedBox(height: 4),
             Text(listing.address,
-                style: const TextStyle(
-                    color: AppColors.textDim, fontSize: 12)),
+                style: const TextStyle(color: AppColors.textDim, fontSize: 12)),
             const SizedBox(height: 4),
             Text(listing.description,
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                    color: AppColors.textMuted, fontSize: 13)),
+                style:
+                    const TextStyle(color: AppColors.textMuted, fontSize: 13)),
           ],
         ),
       ),
@@ -149,8 +186,8 @@ class _MyListingCard extends StatelessWidget {
           ),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('Delete',
-                style: TextStyle(color: AppColors.error)),
+            child:
+                const Text('Delete', style: TextStyle(color: AppColors.error)),
           ),
         ],
       ),
